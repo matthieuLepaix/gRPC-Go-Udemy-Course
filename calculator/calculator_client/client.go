@@ -1,6 +1,8 @@
 package main
 
 import (
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"context"
 	"fmt"
 	"io"
@@ -24,7 +26,9 @@ func main() {
 
 	//doAverage(c) // Client streaming
 
-	doFindMaximum(c) // Bidirecitonal streaming
+	//doFindMaximum(c) // Bidirecitonal streaming
+
+	doSquareRoot(c) //Error handling
 }
 
 func doSum(c calculatorpb.CalculatorServiceClient) {
@@ -91,7 +95,6 @@ func doFindMaximum(c calculatorpb.CalculatorServiceClient) {
 	stream, err := c.FindMaximum(context.Background())
 	if err != nil {
 		log.Fatalf("Error while calling the client FindMaximum: %v", err)
-		return
 	}
 
 	waitc := make(chan struct{})
@@ -118,7 +121,6 @@ func doFindMaximum(c calculatorpb.CalculatorServiceClient) {
 
 			if recErr != nil {
 				log.Fatalf("Error while Receiving FindMaximum: %v", recErr)
-				break
 			}
 
 			log.Printf("New Maximum: %v", res.GetMaximum())
@@ -127,4 +129,30 @@ func doFindMaximum(c calculatorpb.CalculatorServiceClient) {
 	}()
 
 	<-waitc
+}
+
+func doSquareRoot(c calculatorpb.CalculatorServiceClient) {
+	doSquareRootCall(c, 10)
+	doSquareRootCall(c, -10)
+}
+
+func doSquareRootCall(c calculatorpb.CalculatorServiceClient, n int32) {
+	res, err := c.SquareRoot(context.Background(), &calculatorpb.SquareRootRequest{
+		Number: n,
+	})
+	if err != nil {
+		respErr, ok := status.FromError(err)
+		if ok {
+			// user error
+			log.Println(respErr.Message())
+			log.Println(respErr.Code())
+			if respErr.Code() == codes.InvalidArgument {
+				log.Println("We probably sent a negative number")
+				return
+			}
+		}else {
+			log.Fatalf("Big error calling SquareRoot: %v", err)
+		}
+	}
+	fmt.Printf("Result of sqaure root of %v: %v\n", n, res.GetNumberRoot())
 }
