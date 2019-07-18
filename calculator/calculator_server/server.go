@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"math"
 	"net"
 
 	"github.com/matthieulepaix/gRPC-Udemy-Course/calculator/calculatorpb"
@@ -46,16 +47,38 @@ func (*server) ComputeAverage(stream calculatorpb.CalculatorService_ComputeAvera
 		msg, err := stream.Recv()
 		if err == io.EOF {
 			average := float64(sum) / float64(counter)
-		
+
 			return stream.SendAndClose(&calculatorpb.ComputeAverageResponse{
 				Result: average,
 			})
 		}
 		if err != nil {
 			log.Fatalf("Error while reading stream ComputerAverage: %v", err)
+			return err
 		}
 		sum += msg.GetNumber()
 		counter++
+	}
+}
+
+func (*server) FindMaximum(stream calculatorpb.CalculatorService_FindMaximumServer) error {
+	currentMax := int32(math.MinInt32)
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			log.Fatalf("Error while receiving message FindMaximum: %v", err)
+			return err
+		}
+		result := msg.GetNumber()
+		if result > currentMax {
+			currentMax = result
+			stream.Send(&calculatorpb.FindMaximumResponse{
+				Maximum: currentMax,
+			})
+		}
 	}
 }
 

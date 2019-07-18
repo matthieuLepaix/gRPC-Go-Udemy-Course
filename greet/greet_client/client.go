@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"time"
 
 	"github.com/matthieulepaix/gRPC-Udemy-Course/greet/greetpb"
 	"google.golang.org/grpc"
@@ -20,6 +21,8 @@ func main() {
 	doUnary(c)
 
 	doServerStreaming(c)
+
+	doBiDirectionalStreaming(c)
 }
 
 func doUnary(c greetpb.GreetServiceClient) {
@@ -61,4 +64,65 @@ func doServerStreaming(c greetpb.GreetServiceClient) {
 		log.Printf("Response from GreetManyTimes: %v", msg)
 	}
 
+}
+
+func doBiDirectionalStreaming(c greetpb.GreetServiceClient) {
+	stream, err := c.GreetEveryone(context.Background())
+	if err != nil {
+		log.Fatalf("Error while creating stream: %v", err)
+		return
+	}
+
+	requests := []*greetpb.GreetEveryoneRequest{
+		&greetpb.GreetEveryoneRequest{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Matthieu",
+				LastName:  "Lepaix",
+			},
+		},
+		&greetpb.GreetEveryoneRequest{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Yoann",
+				LastName:  "Pencalet",
+			},
+		},
+		&greetpb.GreetEveryoneRequest{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Rami",
+				LastName:  "Ben Hamed",
+			},
+		},
+	}
+
+	waitc := make(chan struct{})
+
+	// Send messages
+	go func() {
+		for _, req := range requests {
+			SendErr := stream.Send(req)
+			if SendErr != nil {
+				log.Fatalf("Error while sending BiDirectionalStreaming: %v", SendErr)
+				return
+			}
+			time.Sleep(1000 * time.Millisecond)
+		}
+		stream.CloseSend()
+	}()
+	// Receive messages
+	go func() {
+		for {
+			res, RecErr := stream.Recv()
+			if RecErr == io.EOF {
+				break
+			}
+			if RecErr != nil {
+				log.Fatalf("Error while receiving BiDirectionalStreaming: %v", RecErr)
+				close(waitc)
+			}
+			log.Printf("Received: %v", res.GetResult())
+		}
+		close(waitc)
+	}()
+
+	<-waitc
 }
