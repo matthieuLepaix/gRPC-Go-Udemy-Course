@@ -1,6 +1,8 @@
 package main
 
 import (
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"context"
 	"io"
 	"log"
@@ -72,4 +74,22 @@ func main() {
 		log.Fatalf("Failed to serve: %v", err)
 	}
 
+}
+
+func (*server) GreetWithDeadLine(ctx context.Context, req *greetpb.GreetWithDeadLineRequest) (*greetpb.GreetWithDeadLineResponse, error) {
+
+	for i := 0; i < 3; i++ {
+		if ctx.Err() == context.Canceled {
+			log.Printf("The client canceled the request!")
+			return nil, status.Error(codes.Canceled, "The client canceled the request")
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	firstName := req.GetGreeting().GetFirstName()
+	result := "Hello " + firstName
+	res := &greetpb.GreetWithDeadLineResponse{
+		Result: result,
+	}
+	return res, nil
 }
